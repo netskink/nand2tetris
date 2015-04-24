@@ -42,5 +42,29 @@ CHIP ALU {
         ng; // 1 if (out < 0),  0 otherwise
 
     PARTS:
-   // Put you code here:
+    // X Stage
+	Mux16(a=x,b=false,sel=zx,out=Xz);
+	Not16(in=Xz,out=Xzb);
+	Mux16(a=Xz,b=Xzb,sel=nx,out=XPre);
+    // Y Stage
+	Mux16(a=y,b=false,sel=zy,out=Yz);
+	Not16(in=Yz,out=Yzb);
+	Mux16(a=Yz,b=Yzb,sel=ny,out=YPre);
+	// Op Stage
+	Add16(a=XPre, b=YPre, out=AddR);
+	And16(a=XPre, b=YPre, out=AndR);
+	Mux16(a=AndR,b=AddR,sel=f,out=Out1);
+	// Out Stage
+	Not16(in=Out1,out=Out1b);
+	Mux16(a=Out1,b=Out1b,sel=no,out=out, out[0..7]=outxlow, out[8..15]=outxhigh, out[15]=msb);
+	// Flag Stage
+	//// Zero Register
+	//Not(in=out,out=outb);
+	Or8Way(in=outxlow, out=outlow);
+	Or8Way(in=outxhigh, out=outhigh);
+	Or(a=outlow, b=outhigh,out=zrb);
+	Not(in=zrb,out=zr);
+	//// Neg Register
+	And(a=msb,b=true, out=ng);
+
 }
