@@ -17,4 +17,7 @@ CHIP PC {
 
     PARTS:
     // Put your code here:
+	DMux16(a=false, b=incr, sel=reset, out=inx);
+	Register(in=inx,load=load,out=out,out=outr);
+	Add16(a=true, b=outr, out=incr);
 }
