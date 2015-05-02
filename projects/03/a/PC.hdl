@@ -17,7 +17,11 @@ CHIP PC {
 
     PARTS:
     // Put your code here:
-	DMux16(a=false, b=incr, sel=reset, out=inx);
-	Register(in=inx,load=load,out=out,out=outr);
-	Add16(a=true, b=outr, out=incr);
+	Mux16(a=outr, b=incr, sel=inc, out=inincr);
+	Mux16(a=inincr, b=in, sel=load, out=loadx);
+	Mux16(a=loadx, b=false, sel=reset, out=regin);
+	Or(a=load, b=reset, out=loadreset);
+	Or(a=loadreset, b=inc, out=loadresetinc);
+	Register(in=regin,load=loadresetinc,out=out,out=outr);
+	Add16(a[0]=true, a[1..15]=false, b=outr, out=incr);
 }
