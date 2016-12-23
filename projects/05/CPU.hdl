@@ -39,5 +39,198 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    //Register(in=16, load=1,    out=16)
+    //Mux16(a=16, b=16, sel=1,    out=16)
+    //ALU(x=16, y=16, zx=, nx=, zy=, ny=, f=, no=,   out=16, zr=, ng=)
+    //PC(in=16, load=, inc=, reset=, out=16)
+    //And(a=1, b=1, out=1)
+    //Or(a=1, b=1, out=1)
+    //Not(in=1, out=1)
+    //And4(a=4, b=4, out=4)
+    //Or8Way(in=8, out=1)
+
+
+
+    // ALU
+    ALU(x=outRegD, y=outMux1, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6],   out=outM, out=outALU, zr=zr, ng=ng);
+    Or(a=instruction[11], b=instruction[7], out=i11is0i7is0);
+
+    // D register
+    DRegister(in=outALU, load=loadD, out=outRegD);
+    // Mux to ALU - Mux1
+    Mux16(a=outRegA, b=inM, sel=instruction[12], out=outMux1);
+    And(a=instr1513is7, b=instruction[4], out=loadD);
+
+    // writem = instruction[3] AND instr1513is7 = 111
+    And(a=instruction[3], b=instr1513is7, out=writeM);
+
+
+    // A register
+    ARegister(in=outMux2, load=loadA,    out=outRegA, out[0..14]=addressM);
+    // Mux to A Register - Mux2
+    Mux16(a=outALU, b=instruction, sel=nin15, out=outMux2);
+    // A Mux select
+    Not(in=instruction[15], out=nin15);
+    // loadA = 1 when instr is nin15 or (instr[15..13] AND instr[5])
+    And(a=instr1513is7, b=instruction[5], out=loadAinstrC);
+    Or(a=nin15, b=loadAinstrC, out=loadA);
+
+
+    // PC
+    // inc can be set to true and it will be overridden
+    // Perhaps a better way would be to set inc=!reset
+    PC(in=outRegA, load=loadPC, inc=true, reset=reset, out[0..14]=pc);
+
+
+
+///////////////////////////////////////////////////////////
+
+    // JMP Logic
+    // instr[15..13] = 111
+    // jumpcheck=1
+    // This ensures the three MSB bits are one.
+    And(a=instruction[14], b=instruction[13], out=jpmchk1);
+    And(a=jpmchk1, b=instruction[15], out=jumpcheck);
+
+    // Below we will need not bits for all three lower bits.
+    Not(in=instruction[0], out=notin0);
+    Not(in=instruction[1], out=notin1);
+    Not(in=instruction[2], out=notin2);
+
+    // We will need inverse of alu status bits
+    Not(in=zr, out=notzr);
+    Not(in=ng, out=notng);
+    And(a=notzr, b=ng, out=notzrng);
+    Not(in=notzrng, out=notnotzrng);
+    And(a=notzr, b=notng, out=notzrnotng);
+    Not(in=notzrnotng, out=notnotzrnotng);
+
+
+    // Form instrlsb variants
+    // instr20is0 = 000
+    And(a=notin2, b=notin1, out=instr21is0);
+    And(a=notin0, b=instr21is0, out=instr20is0);
+    // instr20is1 = 001
+    And(a=instruction[0], b=instr21is0, out=instr20is1);
+    // instr20is2 = 010
+    And(a=notin2, b=instruction[1], out=instr21is1);
+    And(a=notin0, b=instr21is1, out=instr20is2);
+    // instr20is3 = 011
+    And(a=instruction[0], b=instr21is1, out=instr20is3);
+    // instr20is4 = 100
+    And(a=instruction[2], b=notin1, out=instr21is2);
+    And(a=notin0, b=instr21is2, out=instr20is4);
+    // instr20is5 = 101
+    And(a=instruction[0], b=instr21is2, out=instr20is5);
+    // instr20is6 = 110
+    And(a=notin0, b=instr21is3, out=instr20is6);
+    // instr20is7 = 111
+    And(a=instruction[2], b=instruction[1], out=instr21is3);
+    And(a=instruction[0], b=instr21is3, out=instr20is7);
+
+    // Instrmsb variants
+    // instr1513is7 = 111
+    And(a=instruction[15], b=instruction[14], out=instr1514is3);
+    And(a=instruction[13], b=instr1514is3, out=instr1513is7);
+    Not(in=instr1513is7,out=notinstr1513is7);
+
+
+    //
+    // Calculate the jump checks 
+    // based upon instruction bits
+    //
+
+    // jmpgtzero
+    // jump when out>0
+    // instr[2..0] = 001  instr20is1
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is1, b=jumpcheck, out=jmpgtzero);
+
+    // jmpeqzero
+    // jump when out=0
+    // instr[2..0] = 010    instr20is2
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is2, b=jumpcheck, out=jmpeqzero);
+    
+    // jmpgezero
+    // jump when out>=0
+    // instr[2..0] = 011    instr20is3
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is3, b=jumpcheck, out=jmpgezero);
+
+    // jmpltzero
+    // jump when out<0
+    // instr[2..0] = 100    instr20is4
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is4, b=jumpcheck, out=jmpltzero);
+
+    // jmpnezero
+    // jump when out!=0
+    // instr[2..0] = 101    instr20is5
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is5, b=jumpcheck, out=jmpnezero);
+
+    // jmplezero
+    // jump when out<=0
+    // instr[2..0] = 110    instr20is6
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is6, b=jumpcheck, out=jmplezero);
+
+    // jmpalways
+    // jump always
+    // instr[2..0] = 111    instr20is7
+    // instr[15..13] = 111 jumpcheck
+    And(a=instr20is7, b=jumpcheck, out=jmpalways);
+
+    //
+    // Set the PC load bit based upon status flags
+    // and instruction
+    //
+
+
+    // jump when out>0
+    // ng = 0 and zr = 0
+    And(a=jmpgtzero, b=notngnotzr, out=dojmp1);
+    And(a=notng, b=notzr, out=notngnotzr);
+
+    // jump when out=0
+    // zr = 1
+    And(a=jmpeqzero, b=zr, out=dojmp2);
+
+    // jump when out>=0
+    // not
+    //  zr = 0
+    //  ng = 1
+    And(a=jmpgezero, b=notnotzrng, out=dojmp3);
+
+    // jump when out<0
+    // ng = 1
+    And(a=jmpltzero, b=ng, out=dojmp4);
+
+    // jump when out!=0
+    // zr = 0
+    And(a=jmpnezero, b=notzr, out=dojmp5);
+
+    // jump when out<=0
+    // zr = 0
+    // ng = 0
+    And(a=jmplezero, b=notnotzrnotng, out=dojmp6);
+
+    // Build PC loadinput
+    Or8Way(in[7]=jmpalways, in[6]=dojmp6, in[5]=dojmp5, in[4]=dojmp4, in[3]=dojmp3, in[2]=dojmp2, in[1]=dojmp1, in[0]=false, out=loadPC);
+/////////////////////////////////////////////
+
+    // ALU select Instruction Decode
+    //Mux16(a=16, b=16, sel=1,    out=16);
+
+
 }
+
+
+
+
+
+
+
+
+

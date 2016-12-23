@@ -28,4 +28,37 @@ CHIP Memory {
 
     PARTS:
     // Put your code here:
+    // Three chip pars. 
+    // RAM    16K       0x0         16,383
+    //                  0x00000     0x3FFF
+    // Screen 8K        16,384       24,575
+    //                  0x4000      0x5FFF
+    // Keyboard 16 bit register     24,576
+    //                  0x6000      0x6000
+    // RAM16K(in=16bits load=, address=14-bit, out=16-bits);
+    // Register(in=16bits load=, out=16-bits);
+    // Keyboard(out=16-bit);
+    // Screen(in=16-bit, load=, address=13-bits, out=16-bits);
+    // DMux8Way(in=, sel=3-bits, a=, b=, c=, d=, f=, h=);
+    // DMux4Way(in=, sel=2-bits, a=, b=c, c=, d=);
+    // Mux4Way16(a=16-bits, b=, c=, d=, sel=2-bits, out=16-bits);
+
+
+    DMux4Way(in=load, sel=address[13..14], a=loadrama, b=loadramb, c=loadscrn, d=unused);
+    Or(a=loadrama, b=loadramb, out=loadram);
+    RAM16K(in=in, load=loadram, address=address[0..13], out=outram);
+    Screen(in=in, load=loadscrn, address=address[0..12], out=outscrn);
+    Keyboard(out=outkey);
+    Mux4Way16(a=outram, b=outram, c=outscrn, d=outkey, sel=address[13..14], out=out);
+    
+
+
 }
+
+
+
+
+
+
+
+
